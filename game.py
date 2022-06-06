@@ -48,14 +48,19 @@ class Board:
                     self.preexisting.append((row, col))
         self.window = pygame.display.set_mode((WIDTH, HEIGHT))
 
+        self.font = pygame.font.SysFont("system", 120)
+
+
         self.selected = None  # Coordinates of the currently selected tile
+
+        self.strikes = 0
 
     def __str__(self):
         return pprint.pformat(self.grid)
 
     def main(self):
         looping = True
-
+        strikeText = None
         # Main Game Loop
         while looping:
             self.draw_grid()
@@ -84,13 +89,17 @@ class Board:
                             case pygame.K_1:
                                 self.grid[self.selected[0]][self.selected[1]] = True
                     if event.key == pygame.K_RETURN:
-                        tupleGrid = tuple(tuple(x) for x in self.grid)
-                        # pprint.pprint(tupleGrid)
-                        # print()
-                        print(binaryPuzzle.check(tupleGrid))
+                        finished = self.check()
+                        strikeText = self.draw_check(finished)
+
+                    if event.key in [pygame.K_LEFT, pygame.K_UP, pygame.K_RIGHT, pygame.K_DOWN]:
+                        self.move_selection(event.key)
 
             self.draw_select()
             self.draw_cell_values()
+            if strikeText:
+                self.window.blit(strikeText, self.grid_coords_to_canvas_coords((6, 0)))
+
             pygame.display.update()
             fpsClock.tick(FPS)
 
@@ -128,7 +137,6 @@ class Board:
         # TODO: make not hardcoded
 
     def draw_cell_values(self):
-        font = pygame.font.SysFont("system", 120)
 
         for i in range(len(self.grid)):
             for j in range(len(self.grid[0])):
@@ -139,15 +147,44 @@ class Board:
                     text = str(int(cell))
                 colour = BLACK if (i, j) in self.preexisting else GREY
 
-                text = font.render(text, True, colour)
+                text = self.font.render(text, True, colour)
                 self.window.blit(text, self.grid_coords_to_canvas_coords((i, j), offset=(25, 10)))
 
     def draw_select(self):
         if self.selected:
-            pygame.draw.rect(self.window, RED, (*self.grid_coords_to_canvas_coords(self.selected), 100, 100), 4)
+            colour = GREY if self.selected in self.preexisting else RED
+            pygame.draw.rect(self.window, colour, (*self.grid_coords_to_canvas_coords(self.selected), 100, 100), 4)
+
+    def move_selection(self, key):
+        move = 0, 0
+        match key:
+            case pygame.K_LEFT:
+                move = 0, -1
+            case pygame.K_UP:
+                move = -1, 0
+            case pygame.K_RIGHT:
+                move = 0, 1
+            case pygame.K_DOWN:
+                move = 1, 0
+
+        if 0 <= self.selected[0] + move[0] < 6:
+            self.selected = self.selected[0] + move[0], self.selected[1]
+
+        if 0 <= self.selected[1] + move[1] < 6:
+            self.selected = self.selected[0], self.selected[1] + move[1]
 
     def check(self):
-        pass
+        self.strikes += 1
+        tupleGrid = tuple(tuple(x) for x in self.grid)
+        result = binaryPuzzle.check(tupleGrid)
+        self.draw_check(result)
+        return result
+
+    def draw_check(self, valid):
+
+        text = self.font.render("x" * self.strikes, True, RED)
+        return text
+
 
 
 board = Board(get_grid('grid.csv'))
